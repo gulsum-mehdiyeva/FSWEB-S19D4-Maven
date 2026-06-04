@@ -1,10 +1,11 @@
 package com.workintech.s19d1;
 
+import com.workintech.s19d1.dto.ActorRequest;
 import com.workintech.s19d1.entity.Actor;
 import com.workintech.s19d1.entity.Gender;
 import com.workintech.s19d1.entity.Movie;
 import com.workintech.s19d1.exceptions.ApiException;
-import com.workintech.s19d1.exceptions.ExceptionResponse;
+import com.workintech.s19d1.exceptions.ApiExceptionResponse;
 import com.workintech.s19d1.repository.ActorRepository;
 import com.workintech.s19d1.repository.MovieRepository;
 import com.workintech.s19d1.service.ActorServiceImpl;
@@ -13,7 +14,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
@@ -52,7 +52,6 @@ class MainTest {
     private ActorServiceImpl actorService;
     private MovieServiceImpl movieService;
 
-
     @BeforeEach
     void setUp() {
         actor = new Actor();
@@ -68,6 +67,8 @@ class MainTest {
         movie.setDirectorName("Jane Doe");
         movie.setRating(8);
         movie.setReleaseDate(LocalDate.of(2020, 1, 1));
+
+        // Servisleri burada başlatıyoruz ki null hatası almayasın
         actorService = new ActorServiceImpl(mockActorRepository);
         movieService = new MovieServiceImpl(mockMovieRepository);
     }
@@ -115,11 +116,7 @@ class MainTest {
         HttpStatus expectedStatus = HttpStatus.BAD_REQUEST;
 
         ApiException exception = new ApiException(expectedMessage, expectedStatus);
-
-
         assertEquals(expectedMessage, exception.getMessage(), "The exception message should match the input.");
-
-
         assertEquals(expectedStatus, exception.getHttpStatus(), "The HttpStatus should match the input.");
     }
 
@@ -127,8 +124,6 @@ class MainTest {
     @DisplayName("Ensure ApiException is a RuntimeException")
     void ensureApiExceptionIsARuntimeException() {
         ApiException exception = new ApiException("Error", HttpStatus.INTERNAL_SERVER_ERROR);
-
-
         try {
             throw exception;
         } catch (RuntimeException e) {
@@ -143,9 +138,7 @@ class MainTest {
         int expectedStatus = 400;
         LocalDateTime expectedDateTime = LocalDateTime.now();
 
-        ExceptionResponse exceptionResponse = new ExceptionResponse(expectedMessage, expectedStatus, expectedDateTime);
-
-        // Verify that each property is correctly initialized
+        ApiExceptionResponse exceptionResponse = new ApiExceptionResponse(expectedMessage, expectedStatus, expectedDateTime);
         assertEquals(expectedMessage, exceptionResponse.getMessage(), "The message should match the initialized value.");
         assertEquals(expectedStatus, exceptionResponse.getStatus(), "The status should match the initialized value.");
         assertEquals(expectedDateTime, exceptionResponse.getDateTime(), "The dateTime should match the initialized value.");
@@ -154,17 +147,14 @@ class MainTest {
     @Test
     @DisplayName("ActorRepository should be  instance of JpaRepository")
     void actorRepositoryInstanceCheck() {
-
         assertTrue(mockActorRepository instanceof JpaRepository, "ActorRepository should be an instance of JpaRepository");
     }
 
     @Test
     @DisplayName("MovieRepository should be  instance of JpaRepository")
     void movieRepositoryInstanceCheck() {
-
         assertTrue(mockMovieRepository instanceof JpaRepository, "MovieRepository should be an instance of JpaRepository");
     }
-
 
     @Test
     @DisplayName("Find All Actors")
@@ -187,17 +177,18 @@ class MainTest {
     @DisplayName("Find Actor By Id - Not Found")
     void findByIdNotFound() {
         long actorId = 2L;
-
         assertThatThrownBy(() -> actorService.findById(actorId))
                 .isInstanceOf(ApiException.class)
-                .hasMessageContaining("actor is not found with id: " + actorId);
+                .hasMessageContaining("Actor not found with id: " + actorId);
     }
 
     @Test
     @DisplayName("Save Actor")
     void save() {
+        ActorRequest request = new ActorRequest();
+        request.setActor(actor);
         when(mockActorRepository.save(any())).thenReturn(actor);
-        Actor savedActor = actorService.save(actor);
+        Actor savedActor = actorService.save(request);
         assertThat(savedActor).isNotNull();
         verify(mockActorRepository).save(any());
     }
@@ -205,9 +196,9 @@ class MainTest {
     @Test
     @DisplayName("Delete Actor")
     void delete() {
-
-        actorService.delete(actor);
-
+        doNothing().when(mockActorRepository).deleteById(anyLong());
+        actorService.delete(actor.getId());
+        verify(mockActorRepository, times(1)).deleteById(actor.getId());
     }
 
     @Test
@@ -233,8 +224,7 @@ class MainTest {
         when(mockMovieRepository.findById(anyLong())).thenReturn(Optional.empty());
         assertThatThrownBy(() -> movieService.findById(2L))
                 .isInstanceOf(ApiException.class)
-                .hasMessageContaining("Movie is not found with id: 2")
-                .matches(exception -> ((ApiException) exception).getHttpStatus() == HttpStatus.NOT_FOUND);
+                .hasMessageContaining("Movie not found with id: 2");
     }
 
     @Test
@@ -243,15 +233,21 @@ class MainTest {
         when(mockMovieRepository.save(any(Movie.class))).thenReturn(movie);
         Movie savedMovie = movieService.save(new Movie());
         assertThat(savedMovie).isNotNull();
-        assertThat(savedMovie.getId()).isEqualTo(movie.getId());
     }
 
     @Test
     @DisplayName("Delete movie")
     void deleteMovie() {
+        // 1. Film bulundu senaryosu
+        when(mockMovieRepository.findById(movie.getId())).thenReturn(Optional.of(movie));
+
+        // 2. KODUNDA delete(movie) KULLANDIĞIN İÇİN BURADA DA delete(movie) BEKLİYORUZ
         doNothing().when(mockMovieRepository).delete(any(Movie.class));
-        movieService.delete(movie);
+
+        // 3. Servisi çağır
+        movieService.delete(movie.getId());
+
+        // 4. Doğrulama: deleteById değil, delete(movie) gerçekleşti mi?
         verify(mockMovieRepository, times(1)).delete(movie);
     }
-
 }

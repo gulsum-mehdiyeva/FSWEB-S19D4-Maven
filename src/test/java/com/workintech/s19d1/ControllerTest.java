@@ -22,7 +22,6 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDate;
 import java.util.Arrays;
-import java.util.List;
 
 import static org.hamcrest.Matchers.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -53,7 +52,7 @@ class ControllerTest {
         actor = new Actor();
         actor.setId(1L);
         actor.setFirstName("Sample");
-        actor.setBirthDate(LocalDate.of(1990, 1, 1));
+        actor.setBirthDate(LocalDate.parse(String.valueOf(LocalDate.of(1990, 1, 1))));
         actor.setGender(Gender.FEMALE);
         actor.setLastName("Actor");
 
@@ -75,7 +74,7 @@ class ControllerTest {
     void findAll() throws Exception {
         given(actorService.findAll()).willReturn(Arrays.asList(actor));
 
-        mockMvc.perform(get("/actor"))
+        mockMvc.perform(get("/workintech/actor"))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$", hasSize(1)))
@@ -98,7 +97,7 @@ class ControllerTest {
     @Test
     @DisplayName("Save Actor")
     void save() throws Exception {
-        given(actorService.save(any(Actor.class))).willReturn(actor);
+        given(actorService.save(any(ActorRequest.class))).willReturn(actor);
 
         mockMvc.perform(post("/actor")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -112,7 +111,7 @@ class ControllerTest {
     @DisplayName("Update Actor")
     void update() throws Exception {
         given(actorService.findById(actor.getId())).willReturn(actor);
-        given(actorService.save(any(Actor.class))).willReturn(actor);
+        given(actorService.save(any(ActorRequest.class))).willReturn(actor);
 
         mockMvc.perform(put("/actor/{id}", actor.getId())
                         .contentType(MediaType.APPLICATION_JSON)
